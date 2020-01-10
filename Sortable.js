@@ -8,7 +8,7 @@
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define(factory) :
   (global = global || self, global.Sortable = factory());
-}(this, function () { 'use strict';
+}(this, (function () { 'use strict';
 
   function _typeof(obj) {
     if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
@@ -57,20 +57,35 @@
     return _extends.apply(this, arguments);
   }
 
-  function _objectSpread(target) {
+  function ownKeys(object, enumerableOnly) {
+    var keys = Object.keys(object);
+
+    if (Object.getOwnPropertySymbols) {
+      var symbols = Object.getOwnPropertySymbols(object);
+      if (enumerableOnly) symbols = symbols.filter(function (sym) {
+        return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+      });
+      keys.push.apply(keys, symbols);
+    }
+
+    return keys;
+  }
+
+  function _objectSpread2(target) {
     for (var i = 1; i < arguments.length; i++) {
       var source = arguments[i] != null ? arguments[i] : {};
-      var ownKeys = Object.keys(source);
 
-      if (typeof Object.getOwnPropertySymbols === 'function') {
-        ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) {
-          return Object.getOwnPropertyDescriptor(source, sym).enumerable;
-        }));
+      if (i % 2) {
+        ownKeys(Object(source), true).forEach(function (key) {
+          _defineProperty(target, key, source[key]);
+        });
+      } else if (Object.getOwnPropertyDescriptors) {
+        Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+      } else {
+        ownKeys(Object(source)).forEach(function (key) {
+          Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+        });
       }
-
-      ownKeys.forEach(function (key) {
-        _defineProperty(target, key, source[key]);
-      });
     }
 
     return target;
@@ -160,6 +175,20 @@
 
   function off(el, event, fn) {
     el.removeEventListener(event, fn, !IE11OrLess && captureMode);
+  }
+
+  function once(el, event, fn) {
+    el.addEventListener(event, fn, {
+      capture: !IE11OrLess && captureMode,
+      once: true
+    });
+  }
+
+  function onceOff(el, event, fn) {
+    el.removeEventListener(event, fn, {
+      capture: !IE11OrLess && captureMode,
+      once: true
+    });
   }
 
   function matches(
@@ -643,7 +672,7 @@
             rect: getRect(child)
           });
 
-          var fromRect = _objectSpread({}, animationStates[animationStates.length - 1].rect); // If animating: compensate for current animation
+          var fromRect = _objectSpread2({}, animationStates[animationStates.length - 1].rect); // If animating: compensate for current animation
 
 
           if (child.thisAnimationDuration) {
@@ -808,7 +837,7 @@
         if (!sortable[plugin.pluginName]) return; // Fire global events if it exists in this sortable
 
         if (sortable[plugin.pluginName][eventNameGlobal]) {
-          sortable[plugin.pluginName][eventNameGlobal](_objectSpread({
+          sortable[plugin.pluginName][eventNameGlobal](_objectSpread2({
             sortable: sortable
           }, evt));
         } // Only fire plugin event if plugin is enabled in this sortable,
@@ -816,7 +845,7 @@
 
 
         if (sortable.options[plugin.pluginName] && sortable[plugin.pluginName][eventName]) {
-          sortable[plugin.pluginName][eventName](_objectSpread({
+          sortable[plugin.pluginName][eventName](_objectSpread2({
             sortable: sortable
           }, evt));
         }
@@ -908,7 +937,7 @@
     evt.originalEvent = originalEvent;
     evt.pullMode = putSortable ? putSortable.lastPutMode : undefined;
 
-    var allEventProperties = _objectSpread({}, extraEventProperties, PluginManager.getEventProperties(name, sortable));
+    var allEventProperties = _objectSpread2({}, extraEventProperties, {}, PluginManager.getEventProperties(name, sortable));
 
     for (var option in allEventProperties) {
       evt[option] = allEventProperties[option];
@@ -928,7 +957,7 @@
         originalEvent = _ref.evt,
         data = _objectWithoutProperties(_ref, ["evt"]);
 
-    PluginManager.pluginEvent.bind(Sortable)(eventName, sortable, _objectSpread({
+    PluginManager.pluginEvent.bind(Sortable)(eventName, sortable, _objectSpread2({
       dragEl: dragEl,
       parentEl: parentEl,
       ghostEl: ghostEl,
@@ -964,7 +993,7 @@
   };
 
   function _dispatchEvent(info) {
-    dispatchEvent(_objectSpread({
+    dispatchEvent(_objectSpread2({
       putSortable: putSortable,
       cloneEl: cloneEl,
       targetEl: dragEl,
@@ -1236,7 +1265,8 @@
         y: 0
       },
       supportPointer: Sortable.supportPointer !== false && 'PointerEvent' in window,
-      emptyInsertThreshold: 5
+      emptyInsertThreshold: 5,
+      allowShortedDrag: false
     };
     PluginManager.initializePlugins(this, el, defaults); // Set default options
 
@@ -1397,6 +1427,8 @@
     touch,
     /** HTMLElement */
     target) {
+      var _this2 = this;
+
       var _this = this,
           el = _this.el,
           options = _this.options,
@@ -1492,7 +1524,41 @@
           on(ownerDocument, 'mousemove', _this._delayedDragTouchMoveHandler);
           on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
           options.supportPointer && on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
-          _this._dragStartTimer = setTimeout(dragStartFn, options.delay);
+
+          if (options.allowShortedDrag) {
+            var shortedDragTouchMoveHandler = function shortedDragTouchMoveHandler() {
+              _this2._disableDelayedDrag();
+
+              disableShortedDragEvents();
+              dragStartFn();
+            };
+
+            var disableShortedDrag = function disableShortedDrag() {
+              onceOff(ownerDocument, 'mousemove', shortedDragTouchMoveHandler);
+              onceOff(ownerDocument, 'touchmove', shortedDragTouchMoveHandler);
+              options.supportPointer && onceOff(ownerDocument, 'pointermove', shortedDragTouchMoveHandler);
+            };
+
+            var disableShortedDragEvents = function disableShortedDragEvents() {
+              onceOff(ownerDocument, 'mouseup', disableShortedDrag);
+              onceOff(ownerDocument, 'touchend', disableShortedDrag);
+              onceOff(ownerDocument, 'touchcancel', disableShortedDrag);
+              disableShortedDrag();
+            }; // If the user releases the click or touch before dragging,
+            // disable the short-circuited drag
+
+
+            once(ownerDocument, 'mouseup', disableShortedDrag);
+            once(ownerDocument, 'touchend', disableShortedDrag);
+            once(ownerDocument, 'touchcancel', disableShortedDrag); // If the user moves the pointer, do the short-circuited drag
+
+            once(ownerDocument, 'mousemove', shortedDragTouchMoveHandler);
+            once(ownerDocument, 'touchmove', shortedDragTouchMoveHandler);
+            options.supportPointer && once(ownerDocument, 'pointermove', shortedDragTouchMoveHandler);
+            _this._dragStartTimer = setTimeout(shortedDragTouchMoveHandler, options.delay);
+          } else {
+            _this._dragStartTimer = setTimeout(dragStartFn, options.delay);
+          }
         } else {
           dragStartFn();
         }
@@ -1825,7 +1891,7 @@
       if (_silent) return;
 
       function dragOverEvent(name, extra) {
-        pluginEvent(name, _this, _objectSpread({
+        pluginEvent(name, _this, _objectSpread2({
           evt: evt,
           isOwner: isOwner,
           axis: vertical ? 'vertical' : 'horizontal',
@@ -2662,7 +2728,7 @@
         throw "Sortable: Mounted plugin must be a constructor function, not ".concat({}.toString.call(plugin));
       }
 
-      if (plugin.utils) Sortable.utils = _objectSpread({}, Sortable.utils, plugin.utils);
+      if (plugin.utils) Sortable.utils = _objectSpread2({}, Sortable.utils, {}, plugin.utils);
       PluginManager.mount(plugin);
     });
   };
@@ -3706,4 +3772,4 @@
 
   return Sortable;
 
-}));
+})));
