@@ -10,9 +10,22 @@ function on(el, event, fn) {
 	el.addEventListener(event, fn, !IE11OrLess && captureMode);
 }
 
-
 function off(el, event, fn) {
 	el.removeEventListener(event, fn, !IE11OrLess && captureMode);
+}
+
+function once(el, event, fn) {
+	el.addEventListener(event, fn, {
+		capture: !IE11OrLess && captureMode,
+		once: true
+	});
+}
+
+function onceOff(el, event, fn) {
+	el.removeEventListener(event, fn, {
+		capture: !IE11OrLess && captureMode,
+		once: true
+	});
 }
 
 function matches(/**HTMLElement*/el, /**String*/selector) {
@@ -528,6 +541,8 @@ const expando = 'Sortable' + (new Date).getTime();
 export {
 	on,
 	off,
+	once,
+	onceOff,
 	matches,
 	getParentOrHost,
 	closest,

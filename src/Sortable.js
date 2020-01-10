@@ -18,6 +18,8 @@ import dispatchEvent from './EventDispatcher.js';
 import {
 	on,
 	off,
+	once,
+	onceOff,
 	closest,
 	toggleClass,
 	css,
@@ -393,7 +395,8 @@ function Sortable(el, options) {
 		fallbackTolerance: 0,
 		fallbackOffset: {x: 0, y: 0},
 		supportPointer: Sortable.supportPointer !== false && ('PointerEvent' in window),
-		emptyInsertThreshold: 5
+		emptyInsertThreshold: 5,
+		allowShortedDrag: false
 	};
 
 	PluginManager.initializePlugins(this, el, defaults);
@@ -645,7 +648,41 @@ Sortable.prototype = /** @lends Sortable.prototype */ {
 				on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
 				options.supportPointer && on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
 
-				_this._dragStartTimer = setTimeout(dragStartFn, options.delay);
+				if (options.allowShortedDrag) {
+					const shortedDragTouchMoveHandler = () => {
+						this._disableDelayedDrag();
+						disableShortedDragEvents();
+						dragStartFn();
+					};
+
+					const disableShortedDrag = () => {
+						onceOff(ownerDocument, 'mousemove', shortedDragTouchMoveHandler);
+						onceOff(ownerDocument, 'touchmove', shortedDragTouchMoveHandler);
+						options.supportPointer && onceOff(ownerDocument, 'pointermove', shortedDragTouchMoveHandler);
+					};
+
+					const disableShortedDragEvents = () => {
+						onceOff(ownerDocument, 'mouseup', disableShortedDrag);
+						onceOff(ownerDocument, 'touchend', disableShortedDrag);
+						onceOff(ownerDocument, 'touchcancel', disableShortedDrag);
+						disableShortedDrag();
+					};
+
+					// If the user releases the click or touch before dragging,
+					// disable the short-circuited drag
+					once(ownerDocument, 'mouseup', disableShortedDrag);
+					once(ownerDocument, 'touchend', disableShortedDrag);
+					once(ownerDocument, 'touchcancel', disableShortedDrag);
+
+					// If the user moves the pointer, do the short-circuited drag
+					once(ownerDocument, 'mousemove', shortedDragTouchMoveHandler);
+					once(ownerDocument, 'touchmove', shortedDragTouchMoveHandler);
+					options.supportPointer && once(ownerDocument, 'pointermove', shortedDragTouchMoveHandler);
+
+					_this._dragStartTimer = setTimeout(shortedDragTouchMoveHandler, options.delay);
+				} else {
+					_this._dragStartTimer = setTimeout(dragStartFn, options.delay);
+				}
 			} else {
 				dragStartFn();
 			}
